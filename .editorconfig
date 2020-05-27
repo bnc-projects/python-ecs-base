@@ -11,5 +11,5 @@ indent_size=2
 max_line_length=150
 insert_final_newline=true
 
-[{*.java,*.js,*.gy,*.gant,*.groovy,*.gradle,*.gdsl,*.gson}]
+[{*.py,*.java,*.js,*.gy,*.gant,*.groovy,*.gradle,*.gdsl,*.gson}]
 indent_size=4

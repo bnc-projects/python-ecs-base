@@ -1,3 +1,0 @@
-rootProject.name = 'spring-boot-java-base'
-include 'service'
-include 'client'
