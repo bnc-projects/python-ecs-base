@@ -5,7 +5,7 @@ dist: bionic
 env:
   global:
   - TF_IN_AUTOMATION=1
-  - SERVICE_NAME=tf-python-base
+  - SERVICE_NAME=python-ecs-base
   - VERSION=0.12.21
   - DEPLOYMENT_ACCESS_KEY_ID=
   - DEPLOYMENT_SECRET_ACCESS_KEY=
@@ -28,23 +28,16 @@ before_install:
 cache:
   directories:
   - "$HOME/.cache/pip"
+  - "$HOME/.pyenv"
 jobs:
   include:
   - stage: test
-    install:
-    - eval $(aws sts assume-role --role-arn "$OPERATIONS_ROLE_ARN" --role-session-name "${TRAVIS_REPO_SLUG//\//-}" | jq -r '.Credentials | @sh "export AWS_SESSION_TOKEN=\(.SessionToken)\nexport AWS_ACCESS_KEY_ID=\(.AccessKeyId)\nexport AWS_SECRET_ACCESS_KEY=\(.SecretAccessKey) "')
-    - ./gradlew assemble
-    - export AWS_ACCESS_KEY_ID=$DEPLOYMENT_ACCESS_KEY_ID
-    - export AWS_SECRET_ACCESS_KEY=$DEPLOYMENT_SECRET_ACCESS_KEY
-    - unset AWS_SESSION_TOKEN
+    install: pip install -r requirements.txt
+    script: python -m unittest discover test
     after_success:
-    - echo "build here"
     - if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash deployment/script/travis_push_container.sh; fi
   - stage: deploy to development
-    if: type = push
-    env:
-    - SPLUNK_TOKEN=
-    - secure: nmuSCIxhq7lJlJ+nu0S8sTF/eYs0EMgEodfl8TwJD50DoFSD8w20vBJW3uFgzMK5XccenUGicZQhRy7HC1waFT2Pu4XHr23xgKlL67UJMsL+pzRLzFuIqXyd7t//KiTGiOHVP8xoS6O2rc1c09CqMg5K6JrlgFxgLi8mnbOveMnSOhRbDIPmbhfaX/xBdj1/Thy4BaHxohLTMd/h+nPosG/9y5aeKi/cieKuRqUAkWgQT56p0TT+bpO3Q+gY6CY0feoariloBSJWiHo0YKmiRGqQd9819dMq6roZjonEB8qJb/YygcJJwwAx/IkRt3Rs6pZhY4UVVLgw4eyjVg4LQ7kl1FuTJWAq5qT6LmCZf+Ec+GYvjUsNTrY9A+wpmhh9Xf6P3XQgI4nGcm5nqh+0UmPhkBZW4YgYWV2SSU1BkdzxG6PiZpB4RWImek7xwvyudPQFCx5bX0gxiKd7QNkS3bEHQjcLJnjVtOsY35iTwdtJlu4zBaHO4z2YWoXet7hzGRL9ZsqmSu5iIjx95Pg1Lc5GFYNKaj06sYPQkiwNrgikbX279gnFkljygrBykcysBSl7l9noQVf9D0oNBecqMPsy6wOV7j1O6ElBxKw5c2EZoiOXkU9B9huyU9QY2DGgY1YBpXxI9hsJQqHpPnpVDBw1PgPWfL2DoErPK+MeiUM=
+    if: type = push AND env(DEPLOY_PRODUCTION) IS present
     install: skip
     script: skip
     deploy:
@@ -56,9 +49,6 @@ jobs:
   - stage: deploy to production
     if: type = push AND branch = master AND env(DEPLOY_PRODUCTION) IS present
     env:
-    - SPLUNK_TOKEN=
-    - secure: Nyl2YPIjXzhXjum+rYBBf+jQbgTz5Mnw/tgvJhggOldHViRufNew5X8rLnpY3wJieoyqgmE2NjUMbx0ZLREQwjhndG5l2txeqknjyYjKaMAoN0mSju7gRtUSIHNvJhLQ0pqejus80f7G1ejbInXeuJNFrx0mx2Z3kP00FRCSgSXiABlXdUv1kDk2un4x+9SDTHz3fmfFH+6ccbAAhm6ns/91bKxvBJZfBlW7aQRVD6cnauZbbrzQpwLPV2qmxuYeg0CLaf4vSnQPOx6abmDLBliPlILRoQjJ1vGdpCIwXExDThAOB9dvhBunGxWgPB2Gqe0hFMPx6wkdinsoFkrUKzHy3CmFjJgCNfgJktSQEfYduCD6dfSdVrZ4kljvMf1taDqEw7vjoQoXxkaftZUxbhMrjrnIqt1SGSxvdQZCKjwxxwiMYXwlMWM1HLdTlPsN569dTOr74C82U9fCPd2IBTLWrAcJ5bKbcVUyP9hI54zaowB6IQju1yTidmuptRfWr/G0ozmdoTVCHMgxF1U8wGzxsGlWrMGW6mDLZfEs/Cq53RiSUNC+NGhGN9TTFIX6qQr/P85kPDhIgqG8/SXxW+rDaknfhnm0UsR1mPhNEOIa9beEIM1/LmszkCFOsr4Eilm+J05lGOseVASoOFDlY/2oZI3ZGLzJzLuWZCnwswY=
-    install: skip
     script: skip
     deploy:
       skip_cleanup: true
@@ -66,15 +56,8 @@ jobs:
       script: bash deployment/script/travis_deploy.sh production
       on:
         branch: master
-notifications:
-  slack:
-    secure: S4Pg6XK5x3pfxldRNJVMuzLfPzKVsGdogr0u0r/pu5dpjJujoecsuDoPS8syej1hZRqJOxK36Ms+NDXRzHNK6w95X69kgwDjzoI3PoKmnqyBJIcgSueyNbm7KoQGgoKTOgEUHZ0A9JbcdH8ThBHUR8wltXctGd3kEp8KC3wSlXzDmLeFJPTqC8DMBmSC00nVL7LtXj4VdOwYZnERKErjjx5f+msOhCNbAXLr7p12O7ewHDhL1jaex4r4yzG8+oevDKYNgpHyd8BCsgsCnjiKewByiVB9q4GBjE6CN3c1VfKdWmPWwF4jgxsz8BqTjshM17msnRyXOaSsB6MG+gGMyNKwFVYEwlsAQyRl5i5IhvjIHVMZVcbon098CpNcpW/ZsWALVQSZUW8yBBVPfVs4gTI071R9hQvDWdHLEkApZpsD24tPwsXGdzupBceyqf3HZn9PDYnqMB+hDxSYmLoJRYqjdFxguUwZEYSRih0c+4npcCBO/QJ5m+4aoG2qJ7Zg10YPr3I/PU+kHKjMzvAME4iZ30CnW0gRskM7nVHZRVmR/vgweZDuo9GYXnOykUUur9S3OEhkEp6Ucmcnkv/DXRa5lU0gqpnfkcJv40UaqoxyypGn2U0dPHPCbYahvTu4QAAAkUU6RsJ3TlDhOg018lJVBBaLx+tXpTD+TpY7/XU=
 addons:
   snaps:
   - name: aws-cli
     confinement: classic
     channel: latest/stable
-  sonarcloud:
-    organization: bnc-projects
-    token:
-      secure: Ehm9iNp6f5fBata+4mkkfwpUelmYZZAkmrakZ0jOsZn3Pw/e6+ZskxOWBdRZQxZbpsQ2QTxrunel4pNgjKpuj340OuDGQGb8it23VslTDuffpDguDkYVBe8RQER2TeJ5ZrcpYbTwNg0KUxwvvjSgbmwDogQkvXu6nxmGjcT+kcKMuVNBXSQrIPalKQNlq5Oga+IBfuqK0zhgRmsHq5LQVqjrn3dckXL7rtaqF7yXX8EIxaRXFzE36hjQlLB0b2OpT9ff6/Jx15kBgb0OYTwHOjhzg94UWljsW1u4Unl+B93drRV87HSmJN1kZZkzprixgvO+ERMaAwVsb3qqDb6qqhIS06uUZfmsV/lKOfoB2WEYA8KdS4oYUOuRULjrWBvhqA+dT/6QPHjSpgssVCfnuFsgw7vbyBuCZAifHmS0g9h/4+N40xYk4jw+L5jIDH72AdktD2o2qY+26lqw6XdxPPwKBrsBcElbYbfTdw/VMYlA9yoOFx5mlRUxhv0Jxt7u5ZD5FmE7H9XleTNnmO13dhcRfEZvUpEWa1Ccn5ueq/03kbXLIaZ6I0LM8ONK/qEqUmY12Ztf7QFs94HED54N62o+5fohbURsxVDE286VO1alUqgOVLOt7dd+X4JhDdu2ix4jHjPsan40eAy6e6FxFn4xsQF5BGPrFvDbCsvP6ok=
